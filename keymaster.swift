@@ -5,10 +5,11 @@ import LocalAuthentication
 
 let policy = LAPolicy.deviceOwnerAuthenticationWithBiometrics
 
-func setPassword(key: String, password: String) -> Bool {
+func setPassword(key: String, service: String, password: String) -> Bool {
   let query: [String: Any] = [
     kSecClass as String: kSecClassGenericPassword,
-    kSecAttrService as String: key,
+    kSecAttrService as String: service,
+    kSecAttrAccount as String: key,
     kSecValueData as String: password
   ]
 
@@ -16,20 +17,22 @@ func setPassword(key: String, password: String) -> Bool {
   return status == errSecSuccess
 }
 
-func deletePassword(key: String) -> Bool {
+func deletePassword(key: String, service: String) -> Bool {
 let query: [String: Any] = [
     kSecClass as String: kSecClassGenericPassword,
-    kSecAttrService as String: key,
+    kSecAttrService as String: service,
+    kSecAttrAccount as String: key,
     kSecMatchLimit as String: kSecMatchLimitOne
   ]
   let status = SecItemDelete(query as CFDictionary)
   return status == errSecSuccess
 }
 
-func getPassword(key: String) -> String? {
+func getPassword(key: String, service: String) -> String? {
   let query: [String: Any] = [
     kSecClass as String: kSecClassGenericPassword,
-    kSecAttrService as String: key,
+    kSecAttrService as String: service,
+    kSecAttrAccount as String: key,
     kSecMatchLimit as String: kSecMatchLimitOne,
     kSecReturnData as String: true
   ]
@@ -45,20 +48,21 @@ func getPassword(key: String) -> String? {
 }
 
 func usage() {
-  print("keymaster [get|set|delete] [key] [secret]")
+  print("keymaster [get|set|delete] [service] [key] [secret]")
 }
 
 func main() {
   let inputArgs: [String] = Array(CommandLine.arguments.dropFirst())
-  if (inputArgs.count < 2 || inputArgs.count > 3) {
+  if (inputArgs.count < 3 || inputArgs.count > 4) {
     usage()
     exit(EXIT_FAILURE) 
   }
   let action = inputArgs[0]
-  let key = inputArgs[1]
+  let service = inputArgs[1]
+  let key = inputArgs[2]
   var secret = ""
-  if (action == "set" && inputArgs.count == 3) {
-    secret = inputArgs[2]
+  if (action == "set" && inputArgs.count == 4) {
+    secret = inputArgs[3]
   }
 
   let context = LAContext()
@@ -72,7 +76,7 @@ func main() {
 
   if (action == "set") {
     context.evaluatePolicy(policy, localizedReason: "set to your password") { success, error in
-      guard setPassword(key: key, password: secret) else {
+      guard setPassword(key: key, service: service, password: secret) else {
         print("Error setting password")
         exit(EXIT_FAILURE)
       }
@@ -85,7 +89,7 @@ func main() {
   if (action == "get") {
     context.evaluatePolicy(policy, localizedReason: "access to your password") { success, error in
       if success && error == nil {
-        guard let password = getPassword(key: key) else {
+        guard let password = getPassword(key: key, service: service) else {
           print("Error getting password")
           exit(EXIT_FAILURE)
         }
@@ -103,7 +107,7 @@ func main() {
   if (action == "delete") {
     context.evaluatePolicy(policy, localizedReason: "delete your password") { success, error in
       if success && error == nil {
-        guard deletePassword(key: key) else {
+        guard deletePassword(key: key, service: service) else {
           print("Error deleting password")
           exit(EXIT_FAILURE)
         }
